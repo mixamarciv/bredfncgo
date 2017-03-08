@@ -22,14 +22,20 @@ func main() {
 		toS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-+_*=|\\/[]{}()<>,.?!;:$#@%^&~№"
 		toS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 		fromS = "01234567"
-		toS = "0123456789"
+		toS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 
 		c0 := NewByteSeqConverterStr(fromS0, fromS)
 		c1 := NewByteSeqConverterStr(fromS, toS)
 		c2 := NewByteSeqConverterStr(toS, fromS)
 
+		//n1 := c1.ConvertStr("1570374555211111111345671234567")
+		//n2 := c2.ConvertStr(n1)
+		//fmt.Printf(" %s -> %s\n", n1, n2)
+		//return
+
 		for i := 0; i < 10; i++ {
-			n0 := a.Itoa(rand.Intn(1000000))
+			
+			n0 := get_randx2(100,1000000)
 			n0 = c0.ConvertStr(n0)
 			n1 := c1.ConvertStr(n0)
 			n2 := c2.ConvertStr(n1)
@@ -38,7 +44,7 @@ func main() {
 			if n0 == n2 {
 				ok = 1
 			}
-			fmt.Printf("%d  %s -> %s -> %s\n", ok, n0, n1, n2)
+			fmt.Printf("%d(%d->%d)  %s -> %s -> %s\n", ok, len(n0),len(n1), n0, n1, n2)
 		}
 
 		{
@@ -52,6 +58,15 @@ func main() {
 		}
 
 	})
+}
+
+func get_randx2(rcnt,rmax int) string {
+	s := ""
+	icnt := rand.Intn(rcnt)+1
+	for i := 0; i < icnt; i++ {
+		s += a.Itoa(rand.Intn(rmax))
+	}
+	return s
 }
 
 func exectime(name string, f func()) {
@@ -227,21 +242,22 @@ func (p *byteSeqConvert) Convert(number []byte) []byte {
 				curbit++
 			}
 
-			s1 := big.NewInt(int64(ni)).Text(2)
-			s2 := big.NewInt(0).SetBytes(bt).Text(2)
-			s3 := big.NewInt(0).SetBytes(bt).Text(p.fromSeqLen)
-			fmt.Printf("%s i:%d ni:%d nib:%s  bnb:%s  bn:%s\n", string(number), i, ni, s1, s2, s3)
+			//s1 := big.NewInt(int64(ni)).Text(2)
+			//s2 := big.NewInt(0).SetBytes(bt).Text(2)
+			//s3 := big.NewInt(0).SetBytes(bt).Text(p.fromSeqLen)
+			//fmt.Printf("%s i:%d ni:%d nib:%s  bnb:%s  bn:%s\n", string(number), i, ni, s1, s2, s3)
 		}
 
 		//в bt массив байт с 256ричной сс из p.fromSeqLen сс
 		//создаем bn(big.Int) из массива байт bt
 		bn := big.NewInt(0).SetBytes(bt)
 
-		fmt.Printf("[%d->%d(bits:%d->%d)][%s/%s->%s]\n\n", p.fromSeqLen, p.toSeqLen, p.fromBits, p.toBits,
-			string(number), bn.Text(p.fromSeqLen), bn.Text(p.toSeqLen))
+		//fmt.Printf("[%d->%d(bits:%d->%d)][%s/%s->%s]\n\n", p.fromSeqLen, p.toSeqLen, p.fromBits, p.toBits,
+		//	string(number), bn.Text(p.fromSeqLen), bn.Text(p.toSeqLen))
 
 		{ //переводим bn из 256 ричной сс в p.toSeqLen сс
 			newlen := (lenn*int(p.fromBits))/int(p.toBits) + 1
+			fmt.Printf("newlen: %d !! lenn:%d * p.fromBits:%d / p.toBits:%d \n", newlen,lenn,p.fromBits,p.toBits)
 			newnum := make([]byte, newlen)
 
 			dv := big.NewInt(int64(p.toSeqLen))
@@ -250,83 +266,32 @@ func (p *byteSeqConvert) Convert(number []byte) []byte {
 			j := newlen
 			for {
 				j--
+				if j < 0 {
+					j++
+					fmt.Printf("ERROR ");
+					fmt.Printf("newlen: %d+1 !! lenn:%d * p.fromBits:%d / p.toBits:%d \n", newlen,lenn,p.fromBits,p.toBits)
+					newlen = newlen + 1
+					newnum2 := make([]byte, newlen)
+					copy(newnum,newnum2)
+				}
+				if bn.Cmp(dv) == -1 { // bn < dv
+					nj := bn.Uint64()
+					newnum[j] = p.toSeq[nj]
+					break
+				}
 				bn, mod = bn.DivMod(bn, dv, mod)
 				nj := mod.Uint64() // остаток от деления (bn%dv)
 				smb := p.toSeq[nj]
 				newnum[j] = smb
-				fmt.Printf("%s j:%d smb:%v  bn:%d  dv:%d  mod:%d \n", string(number), j, smb, bn, dv, mod)
-
-				if bn.Cmp(dv) == -1 { // bn < dv
-					j--
-					nj = bn.Uint64()
-					newnum[j] = p.toSeq[nj]
-					break
-				}
+				//fmt.Printf("%s j:%d smb:%v  bn:%d  dv:%d  mod:%d \n", string(number), j, smb, bn, dv, mod)
 			}
-			fmt.Printf("[%d->%d(bits:%d->%d)][%s->%s]\n\n", p.fromSeqLen, p.toSeqLen, p.fromBits, p.toBits,
-				string(number), string(newnum))
+			//fmt.Printf("[%d->%d(bits:%d->%d)][%s->%s]\n\n", p.fromSeqLen, p.toSeqLen, p.fromBits, p.toBits,
+			//	string(number), string(newnum))
 
-			fmt.Printf("---------------------------------------------------------\n\n")
-			return newnum
+			//fmt.Printf("---------------------------------------------------------\n\n")
+			return newnum[j:]
 		}
 	}
-	return nil
-
-	//if p.fromSeqLen < p.toSeqLen
-	{
-		lenn := int64(len(number))
-		//newlen := len(number)*math.Ceil(p.toSeqLen/p.fromSeqLen) + 1
-		//newnum := make([]byte, newlen)
-
-		b := big.NewInt(0)
-
-		var i int64 = 0
-		for ; i < lenn; i++ {
-			smb := uint8(number[i])
-			ni := p.fromSymbToIdx[smb]
-			pn := int64(ni) * pow(int64(p.fromSeqLen), lenn-i)
-			b.Add(b, big.NewInt(pn))
-		}
-		//fmt.Printf("[%s->%s]", number, b.Text(36))
-
-		//далее переводим из 256сс в p.toSeqLen сс
-		bb := b.Bytes()
-		lenb := int64(len(bb))
-
-		//fmt.Printf("[%d:%s]", lenb, bb)
-
-		var ptoSeqLen uint8 = uint8(p.toSeqLen)
-		newlen := int(lenb)*(256/int(ptoSeqLen)) + 1
-		newnum := make([]byte, newlen)
-
-		j := 0
-		for i = 0; i < lenb; i++ {
-			ni := uint8(bb[i])
-			for {
-				if ni < ptoSeqLen {
-					newnum[j] = p.toSeq[ni]
-					j++
-					break
-				}
-				nj := ni % ptoSeqLen
-				ni /= ptoSeqLen
-				newnum[j] = p.toSeq[nj]
-				j++
-			}
-		}
-		//fmt.Printf("[%d/%d:%s]", newlen, j, newnum)
-
-		/********
-		to := p.toSeqLen
-		if to > 36 {
-			to = 36
-		}
-		fmt.Printf("(p.toSeqLen: %d -> %d)", p.toSeqLen, to)
-		r := []byte(b.Text(to))
-		*********/
-		return newnum[:j]
-	}
-
 	return nil
 }
 
